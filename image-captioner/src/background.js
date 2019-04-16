@@ -6,6 +6,7 @@ const INCEPTION_PATH = 'http://localhost:8080/inception/model.json';
 const CAPTION_PATH = 'http://localhost:8080/mymodel/model.json';
 const IDX2WORD_PATH = 'http://localhost:8080/idx2word.json';
 const WORD2IDX_PATH = 'http://localhost:8080/word2idx.json';
+const TRANSLATOR_PATH = "https://translate.yandex.net/api/v1.5/tr.json/translate?";
 
 class BackgroundProcessing {
 
@@ -21,7 +22,7 @@ class BackgroundProcessing {
     chrome.webRequest.onCompleted.addListener(req => {
       if (req && req.tabId > 0) {
         this.imageRequests[req.url] = this.imageRequests[req.url] || req;
-        this.analyzeImage(req.url);
+        this.processImage(req.url);
       }
     }, { urls: ["<all_urls>"], types: ["image", "object"] });
   }
@@ -30,8 +31,6 @@ class BackgroundProcessing {
     console.log('Loading InceptionV3...');
     const startTime = performance.now();
     this.inception = await tf.loadLayersModel(INCEPTION_PATH);
-    this.inception.predict(tf.zeros([1, IMAGE_SIZE, IMAGE_SIZE, 3])).dispose();
-
     const totalTime = Math.floor(performance.now() - startTime);
     console.log(`InceptionV3 loaded and initialized in ${totalTime}ms...`);
   }
@@ -58,7 +57,7 @@ class BackgroundProcessing {
     fetch(WORD2IDX_PATH)
     .then(response => response.json())
     .then((out) => {
-    this.word2idx = out
+    this.word2idx = out;
     var start_word = "#START#";
     this.word2idx[start_word];
     })
@@ -143,13 +142,13 @@ class BackgroundProcessing {
     	}
     	console.log(startWord.join(' '));
     	startWord.shift();
-        startWord.pop();
-        return startWord.join(' ');
+      startWord.pop();
+      return startWord.join(' ');
     })
     return argmaxCaption;
   }
 
-beamPredict(imgElement, beamIdx){
+async beamPredict(imgElement, beamIdx){
     const embeddings = tf.tidy(() => {
       const img = tf.browser.fromPixels(imgElement).toFloat();
       const cropped = this.cropImage(img);
@@ -203,18 +202,45 @@ beamPredict(imgElement, beamIdx){
         	break;
         }
       }
+      finalCap.shift();
       console.log(finalCap.join(' '));
     	return finalCap.join(' ');
     });
     return beamCaption;
 
 }
+ async translate(caption){
+ 	let request = new XMLHttpRequest();
+	let apikey = 'trnsl.1.1.20190411T083848Z.2884e28c5b508a68.880ce05da65d680d69dc664112a59c4262dd7fb2';
+	let lang = "en-ru";
+	let host = "https://translate.yandex.net/api/v1.5/tr.json/translate?";
 
-  async analyzeImage(src) {
+	let params = 'key=' + encodeURIComponent(apikey) +
+  	'&text=' + encodeURIComponent(caption) +
+  	'&lang=' + encodeURIComponent(lang)+
+  	'&format=plain';
+	request.open("GET", host + params, true);
+
+	let translation;
+	request.onload = () => {
+		if (request.status >= 200 && request.status < 400){
+			let data = JSON.parse(request.response);
+			console.log(data.text);
+			translation = data.text;
+		}
+	};
+
+	request.send();
+	if(translation){
+		return translation
+	}
+ }
+
+  async processImage(src) {
 
     if (!this.inception) {
       console.log('Model not loaded yet, delaying...');
-      setTimeout(() => { this.analyzeImage(src) }, 5000);
+      setTimeout(() => { this.processImage(src) }, 5000);
       return;
     }
 
@@ -223,8 +249,12 @@ beamPredict(imgElement, beamIdx){
       if (!meta.predictions) {
         const img = await this.loadImage(src);
         if (img) {
-          meta.predictions = this.beamPredict(img,3);
-          console.log(src);
+          let cap = await this.beamPredict(img,3);
+          let trnsl = await this.translate(cap);
+          meta.predictions = cap;
+          if (cap && trnsl){
+          	console.log("Caption:", cap, "Translation:",trnsl);
+          }
         }
       }
 

@@ -1,18 +1,16 @@
 var imageMeta = {};
 
 const addAlt = () => {
-	console.log("IN CONTENT")
   	const images = document.getElementsByTagName('img');
   	const keys = Object.keys(imageMeta);
   	for(u = 0; u < keys.length; u++) {
     	var url = keys[u];
     	var meta = imageMeta[url];
-    	console.log(imageMeta[url]);
     	for (i = 0; i < images.length; i++) {
       		var img = images[i];
       		if (img.src === meta.url) {
+      			//console.log(img.alt)
         		img.alt = JSON.stringify(meta.predictions);
-        		console.log("Caption: ",meta.predictions);
         		delete keys[u];
         		delete imageMeta[url];
       		}

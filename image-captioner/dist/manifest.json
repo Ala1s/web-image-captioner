@@ -30,6 +30,10 @@
       "run_at": "document_start"
     }
   ],
+  "browser_action":{
+    "default_title": "Image Captioner",
+    "default_popup": "src/popup.html"  
+  },
   "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
   "manifest_version": 2
 }
