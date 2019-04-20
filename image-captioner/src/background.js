@@ -2,26 +2,55 @@ import 'babel-polyfill';
 import * as tf from '@tensorflow/tfjs';
 
 const IMAGE_SIZE = 299;
-const INCEPTION_PATH = 'http://localhost:8080/inception/model.json';
-const CAPTION_PATH = 'http://localhost:8080/mymodel/model.json';
-const IDX2WORD_PATH = 'http://localhost:8080/idx2word.json';
-const WORD2IDX_PATH = 'http://localhost:8080/word2idx.json';
+const INCEPTION_PATH = 'https://breyman.ru/ala1s/inception/model.json';
+const CAPTION_PATH = 'https://breyman.ru/ala1s/mymodel/model.json';
+const IDX2WORD_PATH = 'https://breyman.ru/ala1s/idx2word.json';
+const WORD2IDX_PATH = 'https://breyman.ru/ala1s/word2idx.json';
 const TRANSLATOR_PATH = "https://translate.yandex.net/api/v1.5/tr.json/translate?";
+var transl = false;
+var algo = "BEAM";
+var language = 'ru';
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && message.action === 'ARGMAX') {
+    algo='ARGMAX';
+  }
+  if (message && message.action === 'BEAM') {
+    algo='BEAM';
+  }
+  if (message && message.action === 'TRANSLATE') {
+    transl = true;
+  }
+  if (message && message.action === 'DONTTRANSLATE') {
+    transl = false;
+  }
+  if (message && message.payload && message.action === 'NEWLANG') {
+    language=message.payload;
+  }
+});
 
-class BackgroundProcessing {
+class BackgroundOps {
 
   constructor() {
-    this.imageRequests = {};
-    this.addListeners();
+    this.imageReqs= {};
+    this.linkListener();
     this.loadInception();
     this.loadDictionaries();
     this.loadCaptionModel();
+    this.timer = setTimeout(() => {this.clearRequests},300000);
+
   }
 
-  addListeners() {
+  clearRequests(){
+  	console.log("cleared");
+  	this.imageReqs= {};
+  	this.timer = setTimeout(() => {this.clearRequests},300000);
+
+  }
+
+  linkListener() {
     chrome.webRequest.onCompleted.addListener(req => {
       if (req && req.tabId > 0) {
-        this.imageRequests[req.url] = this.imageRequests[req.url] || req;
+        this.imageRequests[req.url] =  req;
         this.processImage(req.url);
       }
     }, { urls: ["<all_urls>"], types: ["image", "object"] });
@@ -140,7 +169,6 @@ class BackgroundProcessing {
             if(word=='#END#'||startWord.length>20)
                 break;
     	}
-    	console.log(startWord.join(' '));
     	startWord.shift();
       startWord.pop();
       return startWord.join(' ');
@@ -162,7 +190,6 @@ async beamPredict(imgElement, beamIdx){
       	let flattenLayer = tf.layers.flatten();
       	let flatEmbed = flattenLayer.apply(embeddings.expandDims(0));
     	while(startWord[0][0].length<20){
-    		console.log(startWord[0][0]);
     		let temp=[];
     		for(let s of startWord){
 	            let parCaps = tf.tensor1d(s[0])
@@ -209,10 +236,10 @@ async beamPredict(imgElement, beamIdx){
     return beamCaption;
 
 }
- async translate(caption){
+ async translate(caption, trlang){
  	let request = new XMLHttpRequest();
 	let apikey = 'trnsl.1.1.20190411T083848Z.2884e28c5b508a68.880ce05da65d680d69dc664112a59c4262dd7fb2';
-	let lang = "en-ru";
+	let lang = "en-"+trlang;
 	let host = "https://translate.yandex.net/api/v1.5/tr.json/translate?";
 
 	let params = 'key=' + encodeURIComponent(apikey) +
@@ -225,7 +252,6 @@ async beamPredict(imgElement, beamIdx){
 	request.onload = () => {
 		if (request.status >= 200 && request.status < 400){
 			let data = JSON.parse(request.response);
-			console.log(data.text);
 			translation = data.text;
 		}
 	};
@@ -238,23 +264,33 @@ async beamPredict(imgElement, beamIdx){
 
   async processImage(src) {
 
-    if (!this.inception) {
+    if (!this.inception || !this.captionModel) {
       console.log('Model not loaded yet, delaying...');
       setTimeout(() => { this.processImage(src) }, 5000);
       return;
     }
-
-    var meta = this.imageRequests[src];
+    if(abort){
+    	return;
+    }
+    var meta = this.imageReqs[src];
     if (meta && meta.tabId) {
       if (!meta.predictions) {
         const img = await this.loadImage(src);
         if (img) {
-          let cap = await this.beamPredict(img,3);
-          let trnsl = await this.translate(cap);
-          meta.predictions = cap;
-          if (cap && trnsl){
-          	console.log("Caption:", cap, "Translation:",trnsl);
-          }
+        	let cap;
+        	if (algo=="BEAM"){
+        		cap = await this.beamPredict(img,3);
+        	}
+        	else {
+        		cap = await this.predict(img);
+        	}
+        	if (transl){
+        		let trnsl = await this.translate(cap, language);
+        		meta.predictions = trnsl;
+        	}
+        	else {
+        		meta.predictions = cap;
+        	}
         }
       }
 
@@ -268,4 +304,4 @@ async beamPredict(imgElement, beamIdx){
   }
 }
 
-var bg = new BackgroundProcessing();
+var bg = new BackgroundOps();

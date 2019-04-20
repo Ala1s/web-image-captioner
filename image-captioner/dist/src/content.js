@@ -27,3 +27,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 });
+window.addEventListener('load', addAlt, true);

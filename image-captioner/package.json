@@ -12,9 +12,8 @@
     "chrome"
   ],
   "scripts": {
-    "copy": "copy src/content.js dist/src/content.js && copy src/imagenet_classes.js dist/src/imagenet_classes.js",
-    "build": "parcel build src/background.js -d dist/src/ -o background && npm run copy",
-    "watch": "npm run copy && parcel watch src/background.js --hmr-hostname localhost -d dist/src/ -o background"
+    "build": "parcel build src/background.js -d dist/src/ -o background",
+    "watch": "parcel watch src/background.js --hmr-hostname localhost -d dist/src/ -o background"
   },
   "author": "Alexandra Babicheva <aababicheva_1@edu.hse.ru>",
   "contributors": [

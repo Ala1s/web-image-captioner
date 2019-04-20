@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
 <style>
 .switch {
   position: relative;
@@ -65,13 +66,26 @@ input:checked + .slider:before {
 </style>
 </head>
 <body>
+<p><strong>Caption algorithm: </strong></p>
+<select id="algorithm">
+<option value="am">ArgMax (fast)</option>
+<option value="bs" selected>Beam Search (accurate)</option>
+</select>
 
+<p><strong>Translate captions</strong></p>
 
 <label class="switch">
   <input type="checkbox" id="translate">
   <span class="slider round"></span>
 </label>
+
+<p><strong>Translation language: </strong></p>
+<select id="language" disabled>
+</select>
+<p> Переведено сервисом «Яндекс.Переводчик» <a href="http://translate.yandex.ru/">http://translate.yandex.ru/</a></p>
 <script src="popup.js"></script>
+
+
 
 </body>
 </html> 
